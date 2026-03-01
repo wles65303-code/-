@@ -1,425 +1,53 @@
-// client/src/services/audioMixerService.js
-
-export const finalizeUserSongMix = async (videoUrl, instrumentalUrl, userVocalsBlob) => {
-  await loadFFmpeg();
-
-  // 1. 寫入所有素材
-  await ffmpeg.writeFile('video_src.mp4', await fetchFile(videoUrl));
-  await ffmpeg.writeFile('bgm_inst.mp3', await fetchFile(instrumentalUrl));
-  await ffmpeg.writeFile('user_vox.wav', await fetchFile(userVocalsBlob));
-
-  /**
-   * 2. 構建複雜濾鏡 (Filter Complex)
-   * [1:a] 伴奏加上輕微壓限，騰出空間給人聲
-   * [2:a] 用戶人聲加上 1.2 倍增益與輕微的 Compressing (壓縮)
-   * amix=inputs=2 混音
-   */
-  const filter = [
-    "[1:a]volume=0.8,acompressor=threshold=-20dB:ratio=4:attack=5:release=50[bgm];", // 伴奏稍微壓低
-    "[2:a]volume=1.5,highpass=f=100,lowpass=f=15000[vox];", // 人聲去低頻噪訊、增益
-    "[bgm][vox]amix=inputs=2:duration=first:dropout_transition=2[mixed_audio]" // 混合
-  ].join("");
-
-  await ffmpeg.exec([
-    '-i', 'video_src.mp4',    // 0: 影片
-    '-i', 'bgm_inst.mp3',     // 1: 伴奏
-    '-i', 'user_vox.wav',     // 2: 用戶歌聲
-    '-filter_complex', filter,
-    '-map', '0:v',            // 取原始影片畫面
-    '-map', '[mixed_audio]',  // 取混合後的音軌
-    '-c:v', 'copy',           // 影片流不重編碼，速度極快
-    '-c:a', 'aac',            // 音訊編碼為標準 AAC
-    '-b:a', '192k',           // 確保高音質
-    'final_master_render.mp4'
-  ]);
-
-  const data = await ffmpeg.readFile('final_master_render.mp4');
-  return new Blob([data.buffer], { type: 'video/mp4' });
-};
-// client/src/components/MixingOverlay.jsx
-export default function MixingOverlay({ isMixing }) {
-  if (!isMixing) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl flex flex-col items-center justify-center">
-      {/* 時尚的脈衝動畫 */}
-      <div className="relative w-32 h-32 mb-8">
-        <div className="absolute inset-0 border-2 border-indigo-500 rounded-full animate-ping opacity-20" />
-        <div className="absolute inset-4 border-2 border-violet-500 rounded-full animate-pulse opacity-40" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-indigo-400 text-xs font-bold uppercase tracking-widest">Mixing</span>
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DREAM SKY | Professional AI</title>
+    <style>
+        body { background-color: #f0eee9; color: #4a4a4a; font-family: serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .container { text-align: center; padding: 40px; background: #ffffff; width: 90%; max-width: 500px; border-top: 5px solid #e6d5b8; }
+        h1 { font-size: 2rem; letter-spacing: 5px; color: #c5a059; text-transform: uppercase; }
+        
+        /* 新增：輸入框樣式 */
+        .input-group { margin: 20px 0; }
+        input { width: 80%; padding: 12px; border: 1px solid #e6d5b8; background: #fdfcfb; outline: none; margin-bottom: 10px; }
+        
+        #display-area { width: 100%; height: 400px; background: #fdfcfb; display: flex; align-items: center; justify-content: center; border: 1px solid #eee; }
+        img { max-width: 100%; max-height: 100%; object-fit: cover; }
+        
+        .btn { background: #e6d5b8; color: #5a4d3a; border: none; padding: 15px 30px; cursor: pointer; transition: 0.4s; width: 100%; font-weight: bold; }
+        .btn:hover { background: #c5a059; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>DREAM SKY</h1>
+        <div class="input-group">
+            <input type="text" id="user-prompt" placeholder="描述你想要的時尚風格...">
         </div>
-      </div>
-      
-      <p className="text-zinc-100 font-medium tracking-tight">
-        正在將你的聲紋融入音樂...
-      </p>
-      <p className="text-zinc-500 text-[10px] mt-2 uppercase tracking-[0.3em]">
-        Adjusting Frequencies & Taiwanese Accents
-      </p>
-    </div>
-  );
-}
-        // 如果是 Express 後端，請加入這段 Middleware
-app.use((req, res, next) => {
-  res.header("Cross-Origin-Embedder-Policy", "require-corp");
-  res.header("Cross-Origin-Opener-Policy", "same-origin");
-  next();
-});
-        const fontData = await getCachedFont(); // 使用我們之前的快取邏輯
-await ffmpeg.writeFile('font.ttf', fontData); 
-
-// 檢查檔案是否存在 (調試用)
-const files = await ffmpeg.listDir('/');
-console.log("VFS Files:", files);
-        // 導出完畢後執行
-await ffmpeg.deleteFile('input.mp4');
-await ffmpeg.deleteFile('user_vox.wav');
-await ffmpeg.deleteFile('output.mp4');
-
-// 如果還是崩潰，強制重新整理線程
-await ffmpeg.terminate();
-await ffmpeg.load();
-        const filter = [
-  "[1:a]aresample=44100[bgm];", // 強制重採樣伴奏
-  "[2:a]aresample=44100,volume=1.2[vox];", // 強制重採樣人聲
-  "[bgm][vox]amix=inputs=2:duration=first[aout]"
-].join("");
-        ffmpeg.on('log', ({ message }) => {
-  console.log("🎬 FFmpeg Log:", message); // 這會告訴你到底是哪一行濾鏡出錯
-});
-        // server/routes/voiceRoutes.js
-const ffmpeg = require('fluent-ffmpeg');
-
-router.post('/clone', async (req, res) => {
-  // 修正：在傳給 ElevenLabs 前，強制轉換為單聲道 44100Hz WAV
-  const inputBuffer = req.files.sample.data;
-  ffmpeg(Readable.from(inputBuffer))
-    .toFormat('wav')
-    .audioChannels(1)
-    .audioFrequency(44100)
-    .pipe(uploadStreamToElevenLabs); // 這樣克隆出來的聲音最像你
-});
-        // client/src/services/ffmpegService.js
-const safeText = (text) => {
-  // 修正 1：轉義單引號，避免 FFmpeg 指令中斷
-  let t = text.replace(/'/g, "'\\\\\\''"); 
-  // 修正 2：每 15 個字強制換行，避免超出螢幕
-  return t.match(/.{1,15}/g).join('\\n');
-};
-
-// 使用方式
-`drawtext=fontfile=/font.ttf:text='${safeText(el.content)}':...`
-        const corsOptions = {
-  origin: process.env.CLIENT_URL, // 務必在 Railway 設定這個變數
-  credentials: true,             // 允許傳送 Firebase Auth Token
-};
-app.use(cors(corsOptions));
-        useEffect(() => {
-  // 當組件卸載或重新生成時，手動釋放記憶體
-  return () => {
-    elements.forEach(el => {
-      if (el.type === 'audio' || el.type === 'video') {
-        URL.revokeObjectURL(el.url); 
-      }
-    });
-  };
-}, [elements]);
-        import express from 'express';
-import axios from 'axios';
-import os from 'os';
-
-const router = express.Router();
-
-router.get('/health-check', async (req, res) => {
-  const status = {
-    timestamp: new Date().toISOString(),
-    system: {
-      uptime: Math.floor(process.uptime()) + 's',
-      cpuLoad: os.loadavg(),
-      freeMem: (os.freemem() / 1024 / 1024 / 1024).toFixed(2) + ' GB'
-    },
-    services: {
-      openai: { status: 'testing...' },
-      replicate: { status: 'testing...' },
-      elevenlabs: { status: 'testing...' }
-    }
-  };
-
-  // 1. 測試 OpenAI (TTS/Whisper)
-  try {
-    await axios.get('https://api.openai.com/v1/models', {
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }
-    });
-    status.services.openai.status = '🟢 Online';
-  } catch (e) { status.services.openai.status = '🔴 Offline'; }
-
-  // 2. 測試 Replicate (影片生成)
-  try {
-    await axios.get('https://api.replicate.com/v1/predictions', {
-      headers: { Authorization: `Token ${process.env.REPLICATE_API_TOKEN}` }
-    });
-    status.services.replicate.status = '🟢 Online';
-  } catch (e) { status.services.replicate.status = '🔴 Offline'; }
-
-  // 3. 測試 ElevenLabs (聲紋克隆)
-  try {
-    await axios.get('https://api.elevenlabs.io/v1/user', {
-      headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY }
-    });
-    status.services.elevenlabs.status = '🟢 Online';
-  } catch (e) { status.services.elevenlabs.status = '🔴 Offline'; }
-
-  res.json(status);
-});
-
-export default router;
-        import { useEffect, useState } from 'react';
-
-export default function SystemMonitor() {
-  const [report, setReport] = useState(null);
-
-  const check = async () => {
-    try {
-      const { data } = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/api/status/health-check`);
-      setReport(data);
-    } catch (e) { console.error("Monitor Fail"); }
-  };
-
-  useEffect(() => {
-    check();
-    const timer = setInterval(check, 30000); // 每 30 秒自動更新一次
-    return () => clearInterval(timer);
-  }, []);
-
-  if (!report) return <div className="text-[10px] text-zinc-500">Initializing Monitor...</div>;
-
-  return (
-    <div className="p-4 bg-black/40 border border-white/5 rounded-2xl backdrop-blur-md">
-      <div className="flex justify-between items-center mb-4">
-        <h4 className="text-[10px] font-black tracking-[.2em] uppercase text-zinc-400">系統即時監控</h4>
-        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-      </div>
-
-      <div className="space-y-3">
-        {Object.entries(report.services).map(([name, info]) => (
-          <div key={name} className="flex justify-between items-center">
-            <span className="text-[11px] text-zinc-500 capitalize">{name} API</span>
-            <span className={`text-[10px] font-mono ${info.status.includes('🔴') ? 'text-red-400' : 'text-zinc-300'}`}>
-              {info.status}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4 pt-4 border-t border-white/5 flex justify-between">
-        <span className="text-[9px] text-zinc-600 uppercase">Server Load</span>
-        <span className="text-[9px] text-zinc-400 font-mono">
-          {report.system.cpuLoad[0].toFixed(2)}% | {report.system.freeMem} FREE
-        </span>
-      </div>
-    </div>
-  );
-}
-      // client/src/App.jsx (修正)
-class ErrorBoundary extends React.Component {
-  state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
-          <h2 className="text-xl font-bold text-white mb-2">系統發生了一點意外 ⚡️</h2>
-          <p className="text-zinc-500 text-sm mb-6">別擔心，你的專案已自動儲存至雲端。請嘗試重新整理頁面。</p>
-          <button onClick={() => window.location.reload()} className="px-6 py-2 bg-indigo-600 rounded-full text-sm">重新整理</button>
+        <div id="display-area">
+            <img id="fashion-img" src="https://picsum.photos/800/1200?fashion=1">
         </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-      // client/src/services/ffmpegService.js
-const getOptimizationParams = () => {
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (isMobile) {
-    return ['-s', '720x405', '-b:v', '1M', '-preset', 'ultrafast']; // 降級為 720p 確保不崩潰
-  }
-  return ['-s', '1280x720', '-b:v', '2.5M', '-preset', 'veryfast'];
-};
-
-// 在 ffmpeg.exec 中使用
-await ffmpeg.exec(['-i', 'input.mp4', ...getOptimizationParams(), 'output.mp4']);
-      // server/index.js
-import rateLimit from 'express-rate-limit';
-
-const aiLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 小時
-  max: 10, // 每個 IP 每小時只能生成 10 次 AI 內容
-  message: { error: "創作能量已耗盡，請休息一小時再試。" }
-});
-
-app.use('/api/generate', aiLimiter);
-app.use('/api/voice/clone', aiLimiter);
-      // 修正混音濾鏡，加入 500ms 的延遲補償（根據測試調整）
-const filter = [
-  "[1:a]volume=0.8[bgm];", 
-  "[2:a]adelay=500|500,volume=1.2[vox];", // 同步補償
-  "[bgm][vox]amix=inputs=2:duration=first"
-].join("");
-      cd client
-npm install   # 第一次執行需安裝
-npm run dev   # 啟動後訪問 http://localhost:5173
-      cd server
-npm install   # 第一次執行需安裝
-node index.js # 啟動後訪問 http://localhost:5000
-      # 後端 Server .env
-PORT=5000
-OPENAI_API_KEY=sk-....      # TTS & 歌詞生成
-REPLICATE_API_TOKEN=r8_.... # 影片生成
-ELEVENLABS_API_KEY=....     # 台語聲紋克隆
-FIREBASE_SERVICE_ACCOUNT=... # 資料庫權限
-CLIENT_URL=https://...      # 你的前端網址 (防 CORS)
-
-# 前端 Client .env
-VITE_API_BASE_URL=https://... # 指向後端 Railway 網址
-      import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
-
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
-
-// 封裝 Google 登入邏輯
-export const signInWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    // 這裡會拿到用戶的 Google 大頭照、Email 和 名字
-    return result.user;
-  } catch (error) {
-    console.error("Google Login Error:", error);
-    throw error;
-  }
-};
-      import { signInWithGoogle } from "../lib/firebase";
-
-export default function Login({ onUserUpdate }) {
-  const handleLogin = async () => {
-    const user = await signInWithGoogle();
-    onUserUpdate(user); // 將用戶資訊傳回父組件
-  };
-
-  return (
-    <div className="flex flex-col items-center gap-6 p-8 bg-zinc-900/50 backdrop-blur-2xl rounded-3xl border border-white/5 shadow-2xl">
-      <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-        <span className="text-2xl font-black text-white">N</span>
-      </div>
-      
-      <div className="text-center">
-        <h2 className="text-xl font-bold text-white tracking-tight">歡迎來到 NEON_RUNWAY</h2>
-        <p className="text-zinc-500 text-xs mt-2 uppercase tracking-widest">AI 影片與台語音樂創作平台</p>
-      </div>
-
-      <button 
-        onClick={handleLogin}
-        className="w-full flex items-center justify-center gap-3 py-3 px-6 bg-white text-black rounded-xl font-bold text-sm hover:bg-zinc-200 transition-all active:scale-95"
-      >
-        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
-        使用 Google 帳號快速開始
-      </button>
-
-      <p className="text-[10px] text-zinc-600">
-        登入即代表您同意本平台的隱私權條款
-      </p>
+        <br>
+        <button class="btn" onclick="generate()">立即生成 / 換一張</button>
     </div>
-  );
-}
-      // server/middleware/auth.js
-const admin = require('firebase-admin');
 
-const verifyToken = async (req, res, next) => {
-  const token = req.headers.authorization?.split('Bearer ')[1];
-  if (!token) return res.status(401).send('未授權');
-
-  try {
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = decodedToken; // 將用戶資訊（Email, UID）掛載到 request
-    next();
-  } catch (error) {
-    res.status(403).send('無效的 Token');
-  }
-};
-      VITE_FIREBASE_API_KEY=你的金鑰
-VITE_FIREBASE_AUTH_DOMAIN=你的專案ID.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=你的專案ID
-# ...其他變數也要檢查
-      cd client
-      npm run dev
-      npm install -g vercel
-      vercel login
-      vercel --prod client
-      git add .
-git commit -m "Move client files to root for Vercel"
-git push
-      git add .
-git commit -m "Fix: Move frontend to root"
-git push
-      {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "rootDirectory": "client"
-}
-      {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
-}
-      git add .
-git commit -m "push all files"
-git push
-      {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
-}
-      <h1>Neon Runway 啟動中</h1>
-      <button id="regen-btn" class="secondary-btn">不喜歡？換一張</button>
-      const regenBtn = document.getElementById('regen-btn');
-
-regenBtn.addEventListener('click', () => {
-    // 1. 稍微閃爍一下畫面，給使用者回饋
-    const displayArea = document.getElementById('image-display');
-    displayArea.style.opacity = '0.5'; 
-    
-    // 2. 重新執行你原本的生成函數 (假設名稱是 generateImage)
-    generateImage(); 
-    
-    // 3. 完成後恢復亮度
-    displayArea.style.opacity = '1';
-});
-      .regen-btn {
-  background: transparent;
-  color: #bc13fe;
-  border: 2px solid #bc13fe;
-  padding: 10px 20px;
-  border-radius: 5px;
-  text-transform: uppercase;
-  font-weight: bold;
-  cursor: pointer;
-  /* 霓虹發光效果 */
-  box-shadow: 0 0 10px #bc13fe, inset 0 0 10px #bc13fe;
-  text-shadow: 0 0 5px #bc13fe;
-  transition: 0.3s;
-}
-
-.regen-btn:hover {
-  background: #bc13fe;
-  color: white;
-  box-shadow: 0 0 30px #bc13fe;
-}
+    <script>
+        function generate() {
+            const prompt = document.getElementById('user-prompt').value;
+            const img = document.getElementById('fashion-img');
+            
+            // 模擬處理中
+            img.style.opacity = '0.3';
+            
+            // 這裡未來可以對接 OpenAI 或 Stable Diffusion API
+            setTimeout(() => {
+                img.src = "https://picsum.photos/800/1200?random=" + Math.random();
+                img.onload = () => { img.style.opacity = '1'; };
+                if(prompt) alert("已收到指令：" + prompt + "，正在為您生成...");
+            }, 500);
+        }
+    </script>
+</body>
+</html>
