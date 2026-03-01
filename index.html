@@ -1,0 +1,38 @@
+// client/src/services/audioMixerService.js
+
+export const finalizeUserSongMix = async (videoUrl, instrumentalUrl, userVocalsBlob) => {
+  await loadFFmpeg();
+
+  // 1. 寫入所有素材
+  await ffmpeg.writeFile('video_src.mp4', await fetchFile(videoUrl));
+  await ffmpeg.writeFile('bgm_inst.mp3', await fetchFile(instrumentalUrl));
+  await ffmpeg.writeFile('user_vox.wav', await fetchFile(userVocalsBlob));
+
+  /**
+   * 2. 構建複雜濾鏡 (Filter Complex)
+   * [1:a] 伴奏加上輕微壓限，騰出空間給人聲
+   * [2:a] 用戶人聲加上 1.2 倍增益與輕微的 Compressing (壓縮)
+   * amix=inputs=2 混音
+   */
+  const filter = [
+    "[1:a]volume=0.8,acompressor=threshold=-20dB:ratio=4:attack=5:release=50[bgm];", // 伴奏稍微壓低
+    "[2:a]volume=1.5,highpass=f=100,lowpass=f=15000[vox];", // 人聲去低頻噪訊、增益
+    "[bgm][vox]amix=inputs=2:duration=first:dropout_transition=2[mixed_audio]" // 混合
+  ].join("");
+
+  await ffmpeg.exec([
+    '-i', 'video_src.mp4',    // 0: 影片
+    '-i', 'bgm_inst.mp3',     // 1: 伴奏
+    '-i', 'user_vox.wav',     // 2: 用戶歌聲
+    '-filter_complex', filter,
+    '-map', '0:v',            // 取原始影片畫面
+    '-map', '[mixed_audio]',  // 取混合後的音軌
+    '-c:v', 'copy',           // 影片流不重編碼，速度極快
+    '-c:a', 'aac',            // 音訊編碼為標準 AAC
+    '-b:a', '192k',           // 確保高音質
+    'final_master_render.mp4'
+  ]);
+
+  const data = await ffmpeg.readFile('final_master_render.mp4');
+  return new Blob([data.buffer], { type: 'video/mp4' });
+};
